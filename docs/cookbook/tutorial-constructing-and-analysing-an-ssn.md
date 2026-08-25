@@ -8,49 +8,36 @@ of sequence annotations**. It finishes with three sequence similarity network
 Python block is intended to be copied into the same notebook, console, or
 script, in order.
 
-You will:
+The optional preface retrieves the example FASTA and CSV from NCBI. If you
+already have an unaligned protein FASTA and an annotation CSV, skip the preface
+and begin at **1. Install Landscapy**.
 
-1. retrieve a small, fixed set of solute-binding-protein records and their
-   taxonomy from NCBI;
-2. read the FASTA records as `BaseNumpySequence` objects;
-3. calculate protein-language-model (PLM) embeddings;
-4. use `FitnessLandscape.build` to construct PLM kNN, TDA, and evolutionary-
+In the numbered tutorial you will:
+
+1. install Landscapy;
+2. read FASTA records as `BaseNumpySequence` objects;
+3. load phylum, class, and family annotations from CSV;
+4. calculate protein-language-model (PLM) embeddings;
+5. use `FitnessLandscape.build` to construct PLM kNN, TDA, and evolutionary-
    diffusion graphs;
-5. attach phylum, class, and family annotations from CSV;
-6. query one phylum into a new sub-landscape;
-7. quantify phylum separation with a category-diffusion permutation test;
-8. find Louvain communities and test their association with phylum; and
-9. collapse the SSN to a phylum-level quotient graph.
+6. attach and visualise the annotations;
+7. query one phylum into a new sub-landscape;
+8. quantify phylum separation with a category-diffusion permutation test;
+9. find Louvain communities and test their association with phylum; and
+10. collapse the SSN to a phylum-level quotient graph.
 
 This is a manually run tutorial. It retrieves records from NCBI, downloads an
 ESM model on first use, and performs pairwise alignments for evolutionary
 diffusion, so it is deliberately excluded from the cookbook CI examples.
 
-## 1. Install the packages
-
-Landscapy's default installation includes the graph, embedding, TDA, and
-alignment features used below. Matplotlib is added for plotting.
-
-```bash
-python -m pip install landscapy matplotlib
-```
-
-The commands below use the small
-`facebook/esm2_t6_8M_UR50D` model on CPU. A CUDA device can make embedding
-faster, but CPU execution keeps the example portable.
-
-## 2. Choose the files and import the tools
+## Preface I. Choose where to write the example files
 
 The retrieved FASTA and CSV are placed in a temporary directory. They exist
-long enough to demonstrate file-based loading, but are removed when the Python
-session ends. When adapting the tutorial to your own data, replace `DATA_DIR`
-with a persistent project directory and set `FASTA_PATH` and `ANNOTATION_PATH`
-to your own files.
-
-The figures are saved separately so that the same plots can be included as
-pre-rendered examples in this page.
+for this Python session and are removed when it ends. This preface uses only
+Python's standard library, so Landscapy does not need to be installed yet.
 
 ```python
+import csv
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import time
@@ -58,36 +45,16 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-import networkx as nx
-import numpy as np
-import pandas as pd
-from scipy.spatial.distance import pdist
-from sklearn.decomposition import PCA
-from sklearn.metrics import normalized_mutual_info_score
-
-from fitness_landscape import BaseNumpySequence, FitnessLandscape
-from fitness_landscape.analysis import category_diffusion_hierarchy, graph_properties
-from fitness_landscape.analysis.graph import annotate_louvain_communities
-from fitness_landscape.core import AnnotationLayer
-from fitness_landscape.embedding import ESMEmbedder
-
 temporary_data = TemporaryDirectory(prefix="landscapy-ssn-")
 DATA_DIR = Path(temporary_data.name)
 FASTA_PATH = DATA_DIR / "solute_binding_proteins.fasta"
 ANNOTATION_PATH = DATA_DIR / "solute_binding_protein_taxonomy.csv"
 
-# From a Landscapy source checkout, these files appear beside this tutorial.
-# Use Path("ssn_tutorial_figures") instead when running elsewhere.
-FIGURE_DIR = Path("docs/cookbook/tutorial_ssn_figures")
-FIGURE_DIR.mkdir(parents=True, exist_ok=True)
-
 # NCBI asks API users to identify themselves. Replace this before reuse.
 NCBI_EMAIL = "your.email@example.org"
 ```
 
-## 3. Retrieve deterministic sequence and taxonomy inputs from NCBI
+## Preface II. Define the deterministic NCBI dataset
 
 The accessions below are versioned, so they specify exact sequence records
 rather than asking NCBI for the first page of a changing text search. They are
@@ -154,7 +121,9 @@ def ranked_taxonomy(taxon_record):
     return {rank: ranks.get(rank) for rank in ("phylum", "class", "family")}
 ```
 
-The next block makes two NCBI requests: one for the protein records and one for
+## Preface III. Retrieve and write the example FASTA and CSV
+
+This block makes two NCBI requests: one for the protein records and one for
 their taxonomy records. It then writes a conventional FASTA and CSV. The CSV's
 `accession` column is the key that will keep annotations attached to the right
 sequence even if a table is reordered.
@@ -213,11 +182,21 @@ for accession in ACCESSIONS:
     fasta_lines.extend(sequence[start:start + 80] for start in range(0, len(sequence), 80))
 
 FASTA_PATH.write_text("\n".join(fasta_lines) + "\n", encoding="utf-8")
-pd.DataFrame(rows).drop(columns="sequence").to_csv(ANNOTATION_PATH, index=False)
+annotation_columns = [
+    "accession", "protein_name", "organism", "tax_id", "phylum", "class", "family",
+]
+with ANNOTATION_PATH.open("w", encoding="utf-8", newline="") as handle:
+    writer = csv.DictWriter(handle, fieldnames=annotation_columns)
+    writer.writeheader()
+    writer.writerows(
+        {column: row[column] for column in annotation_columns}
+        for row in rows
+    )
 
 print(f"Wrote {len(rows)} sequences to {FASTA_PATH}")
 print(f"Wrote annotations to {ANNOTATION_PATH}")
-print(pd.DataFrame(rows)[["accession", "phylum", "class", "family"]].head())
+for row in rows[:5]:
+    print({key: row[key] for key in ("accession", "phylum", "class", "family")})
 ```
 
 For a larger analysis, do not select records merely because they produce an
@@ -225,14 +204,61 @@ attractive graph. Define the inclusion rule before graph construction and
 record the accession versions. This small balanced panel is a teaching dataset,
 not a representative survey of solute-binding-protein diversity.
 
-## 4. Load the unaligned FASTA as `BaseNumpySequence` objects
+The preface is now complete. Keep this Python session open to use the generated
+paths below, or substitute paths to your own FASTA and CSV in tutorial step 2.
+
+## 1. Install Landscapy
+
+Landscapy's default installation includes the graph, embedding, TDA, and
+alignment features used below. Matplotlib is added for plotting.
+
+```bash
+python -m pip install landscapy matplotlib
+```
+
+The commands below use the small
+`facebook/esm2_t6_8M_UR50D` model on CPU. A CUDA device can make embedding
+faster, but CPU execution keeps the example portable.
+
+## 2. Load the unaligned FASTA as `BaseNumpySequence` objects
 
 The small reader below is intentionally explicit: it keeps each FASTA header
 as the sequence ID and passes each protein string to
 `BaseNumpySequence.from_string`. The default alphabet is Landscapy's canonical
-20-amino-acid alphabet.
+20-amino-acid alphabet. If you skipped the preface, uncomment and edit the two
+path assignments at the start of the block.
 
 ```python
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+import networkx as nx
+import numpy as np
+import pandas as pd
+from scipy.spatial.distance import pdist
+from sklearn.decomposition import PCA
+from sklearn.metrics import normalized_mutual_info_score
+
+from fitness_landscape import BaseNumpySequence, FitnessLandscape
+from fitness_landscape.analysis import category_diffusion_hierarchy, graph_properties
+from fitness_landscape.analysis.graph import annotate_louvain_communities
+from fitness_landscape.core import AnnotationLayer
+from fitness_landscape.embedding import ESMEmbedder
+
+# If you skipped the NCBI preface, uncomment these lines and use your files.
+# FASTA_PATH = Path("path/to/your_unaligned_proteins.fasta")
+# ANNOTATION_PATH = Path("path/to/your_annotations.csv")
+
+if "FASTA_PATH" not in globals() or "ANNOTATION_PATH" not in globals():
+    raise NameError("Set FASTA_PATH and ANNOTATION_PATH to your input files")
+
+# From a Landscapy source checkout, these files appear beside this tutorial.
+# Use Path("ssn_tutorial_figures") instead when running elsewhere.
+FIGURE_DIR = Path("docs/cookbook/tutorial_ssn_figures")
+FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+
+
 def read_fasta(path):
     records = []
     name = None
@@ -273,7 +299,7 @@ The sequence ID is metadata; sequence equality is based on sequence content.
 Decide whether duplicate strings are biological records, technical replicates,
 or data errors before constructing a graph.
 
-## 5. Load and format the annotation CSV
+## 3. Load and format the annotation CSV
 
 We load taxonomy separately from the FASTA, check its key, and create a table
 indexed by accession. `map_by="name"` will later align this index to
@@ -302,7 +328,7 @@ Phylum, class, and family remain annotations. They are not fitness measurements,
 and converting their names to arbitrary integers would invent an ordering that
 does not exist.
 
-## 6. Calculate the PLM embedding
+## 4. Calculate the PLM embedding
 
 This block embeds every sequence. The rows returned by `embed_sequences` follow
 the input order, which is the same order as `sequences`. Keep those two objects
@@ -324,7 +350,7 @@ and batch size before looking at the graph. The small ESM model here is chosen
 for tutorial runtime, not because it is known to be optimal for this protein
 family.
 
-## 7. Build kNN, TDA, and evolutionary-diffusion landscapes
+## 5. Build kNN, TDA, and evolutionary-diffusion landscapes
 
 All three constructors receive the same sequence order and the same PLM array.
 `embedding_domain="plm"` is important: for kNN it selects ordinary Euclidean
@@ -400,7 +426,7 @@ Different edge counts are not a ranking of graph quality. They mean that graph
 choice changes the question being asked. Downstream quantities should be
 reported with the constructor and parameters that defined their support.
 
-## 8. Attach annotations and visualise them
+## 6. Attach annotations and visualise them
 
 We attach the same keyed annotation table to every landscape. The rest of the
 tutorial uses the kNN landscape, but the TDA and evolutionary-diffusion objects
@@ -477,7 +503,7 @@ The apparent separation depends on both the PLM representation and the kNN
 parameter. Colour separation alone is descriptive; the next sections put
 numbers against specific questions.
 
-## 9. Query one phylum into a new sub-landscape
+## 7. Query one phylum into a new sub-landscape
 
 `query_annotations` returns matching sequence indices and graph nodes. We use
 its induced graph, subset the PLM rows by those same sequence indices, and
@@ -520,7 +546,7 @@ two endpoints both belong to the selected phylum. A missing within-phylum path
 can therefore reflect sampling or the full-graph kNN cutoff; it is not evidence
 of an evolutionary barrier by itself.
 
-## 10. Quantify phylum separation with category diffusion
+## 8. Quantify phylum separation with category diffusion
 
 `category_diffusion_hierarchy` embeds the graph using low-frequency normalized-
 Laplacian modes, then measures Euclidean distances between phylum centroids in
@@ -596,7 +622,7 @@ This p-value is conditional on this fixed graph, label-count distribution, and
 exchangeable-label null. It is not a test that phylum caused the topology, and
 the 25 sequence nodes are not 25 independent evolutionary replicates.
 
-## 11. Find Louvain communities and test co-occurrence with phylum
+## 9. Find Louvain communities and test co-occurrence with phylum
 
 Louvain finds groups with high within-group edge weight relative to the graph's
 null model. The fixed seed makes this run repeatable. The function attaches a
@@ -657,7 +683,7 @@ resolution, seed, or graph constructor changes. Compare member sets and report
 the full parameter record rather than treating community number 0 as a stable
 biological entity.
 
-## 12. Build and visualise a phylum quotient graph
+## 10. Build and visualise a phylum quotient graph
 
 A quotient graph collapses every phylum to one node. Here, node area is
 proportional to the number of source sequences and edge width is proportional
