@@ -7,6 +7,12 @@ invariants, interpret the output, and list common failure modes. Reference pages
 live beside the recipes they govern, and each section index identifies them
 separately.
 
+New users should start with [Tutorial: constructing and analysing an
+SSN](tutorial-constructing-and-analysing-an-ssn.md). It is a manually run,
+end-to-end workflow from an unaligned FASTA and taxonomy CSV through PLM kNN,
+TDA, evolutionary diffusion, annotation queries, category diffusion, Louvain
+communities, and a quotient graph.
+
 ## Sections
 
 - [Installation, system requirements, optional features, and CI coverage](installation/README.md)

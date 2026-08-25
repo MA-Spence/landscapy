@@ -16,6 +16,7 @@ TEST_BLOCK = re.compile(
     flags=re.DOTALL,
 )
 REFERENCE_PAGE = "<!-- cookbook: reference -->"
+MANUAL_PAGE = "<!-- cookbook: manual -->"
 
 
 def _pages(section: str | None) -> list[Path]:
@@ -40,8 +41,13 @@ def main() -> int:
     executed = 0
     recipe_count = 0
     reference_count = 0
+    manual_count = 0
     for page in pages:
         source = page.read_text(encoding="utf-8")
+        if MANUAL_PAGE in source:
+            manual_count += 1
+            print(f"SKIP {page.relative_to(ROOT)} (manual tutorial)")
+            continue
         blocks = [match.group("code") for match in TEST_BLOCK.finditer(source)]
         if not blocks:
             if REFERENCE_PAGE in source:
@@ -59,7 +65,7 @@ def main() -> int:
 
     print(
         f"Executed {executed} cookbook example(s) from {recipe_count} recipe page(s); "
-        f"skipped {reference_count} reference page(s)."
+        f"skipped {reference_count} reference page(s) and {manual_count} manual tutorial(s)."
     )
     return 0
 
