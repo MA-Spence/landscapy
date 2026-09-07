@@ -18,8 +18,9 @@ fitness, select a scalar fitness view, and interpret graphical, spectral,
 subsampling, and permutation analyses. Then continue with [Tutorial: ML
 training and inference on an
 SSN](tutorial-ml-training-and-inference-on-an-ssn.md) to mask held-out values,
-train OHE/PLM MLPs and a PLM GCN, attach prediction layers through
-`landscapy-ml`, and evaluate the models in figures.
+train the same MLP on OHE and PLM features, wrap a user-supplied PyTorch model
+with the `landscapy-ml` adapter interfaces, attach prediction layers, and
+evaluate held-out rankings with Spearman's rho in figures.
 
 ## Sections
 

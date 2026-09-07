@@ -795,5 +795,5 @@ numeric array whose rows have been explicitly matched to
 
 Continue in the same Python session with [Tutorial: ML training and inference
 on an SSN](tutorial-ml-training-and-inference-on-an-ssn.md) to mask a held-out
-test set, train MLP and GCN models through `landscapy-ml`, and attach their
-predictions as new fitness layers.
+test set, train an MLP on OHE and PLM features, and use the `landscapy-ml`
+adapter interfaces to attach its predictions as new fitness layers.
