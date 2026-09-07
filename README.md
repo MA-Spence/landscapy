@@ -78,6 +78,7 @@ landscape.save(Path("landscape.pkl"))
 The [worked-example cookbook](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/README.md) provides examples for common Landscapy usage. Every recipe states its assumptions, expected outputs, and limits of interpretation. Short recipe examples are checked in CI; the networked end-to-end tutorial is run manually.
 
 - [Tutorial: constructing and analysing an SSN](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/tutorial-constructing-and-analysing-an-ssn.md)
+- [Tutorial: Quantitative analysis of an SSN](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/tutorial-quantitative-analysis-of-an-ssn.md)
 - [Installation and system requirements](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/installation/README.md)
 - [Foundations](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/foundations/README.md)
 - [Components, topology, and annotated groups](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/topology/README.md)

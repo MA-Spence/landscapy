@@ -783,3 +783,7 @@ An SSN is a model of neighbourhood support. PLM kNN, TDA, and evolutionary
 diffusion encode different neighbourhood definitions, so agreement is useful
 and disagreement is information—not a reason to select whichever graph gives
 the preferred biological story.
+
+Continue in the same Python session with [Tutorial: Quantitative analysis of an
+SSN](tutorial-quantitative-analysis-of-an-ssn.md) to attach replicated fitness
+and analyze the resulting fitness landscape.

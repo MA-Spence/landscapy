@@ -11,7 +11,11 @@ New users should start with [Tutorial: constructing and analysing an
 SSN](tutorial-constructing-and-analysing-an-ssn.md). It is a manually run,
 end-to-end workflow from an unaligned FASTA and taxonomy CSV through PLM kNN,
 TDA, evolutionary diffusion, annotation queries, category diffusion, Louvain
-communities, and a quotient graph.
+communities, and a quotient graph. Continue in the same Python session with
+[Tutorial: Quantitative analysis of an
+SSN](tutorial-quantitative-analysis-of-an-ssn.md) to attach replicated synthetic
+fitness, select a scalar fitness view, and interpret graphical, spectral,
+subsampling, and permutation analyses.
 
 ## Sections
 
