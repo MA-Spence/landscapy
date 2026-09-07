@@ -14,8 +14,6 @@ order and keep the same Python session open. They leave us with:
 
 We will not construct the SSN again. Instead, we will use `landscapy-ml` as an
 adapter between this existing Landscapy object and ordinary PyTorch code.
-Every Python block is intended to be copied into the same notebook, console,
-or script, in order.
 
 The central idea is that your model does not need to know how Landscapy stores
 sequences or fitness layers. Two small interface objects make the connection:
@@ -32,41 +30,20 @@ the same simple multilayer perceptron (MLP) trained once on one-hot-encoded
 
 In the numbered tutorial you will:
 
-1. prepare Landscapy, `landscapy-ml`, PyTorch, and plotting tools;
-2. make a deterministic training, validation, and held-out test split;
-3. hide the test fitness values in a separate training layer;
-4. define an ordinary PyTorch MLP;
-5. export OHE and PLM tensors through the bridge;
-6. train the MLP on each feature representation;
-7. adapt the trained models and their inputs for landscape-wide inference;
-8. attach predictions as new fitness layers; and
-9. measure held-out ranking with Spearman's rho and show the results in figures.
+1. make a deterministic training, validation, and held-out test split;
+2. hide the test fitness values in a separate training layer;
+3. export OHE and PLM tensors through the bridge;
+4. train the MLP on each feature representation;
+5. adapt the trained models and their inputs for landscape-wide inference;
+6. attach predictions as new fitness layers; and
+7. measure held-out ranking with Spearman's rho and show the results in figures.
 
-This is a manually run tutorial. PLM embedding can download a model on first
-use, and the training blocks perform real model fitting, so this page is
-deliberately excluded from the cookbook CI examples.
+## Preface: an existing PyTorch model
 
-The example teaches a reusable software pipeline. Five synthetic held-out
-values make the mechanics visible, but they are far too few for a scientific
-comparison of OHE and PLM representations.
-
-## 1. Install the machine-learning packages and prepare the continuation
-
-If you have not already installed the packages, install them in the Python
-environment used for the preceding tutorials:
-
-```bash
-python -m pip install landscapy landscapy-ml matplotlib
-```
-
-The imports below cover every later block. Training is kept on CPU because the
-example landscape is tiny and CPU execution is the most portable choice.
-
-The constructing tutorial already calculated the `plm` embedding with
-Landscapy's `ESMEmbedder`. The explicit check below makes that prerequisite
-visible. When adapting only this tutorial to another landscape, Landscapy can
-calculate a missing PLM representation before any split-dependent training
-begins.
+The rest of this tutorial assumes that the model has already been defined. It
+is a generic PyTorch object, not a model defined in Landscapy. The example uses
+the following `SimpleMLP`; users can substitute another model when they create
+the model adapter later in the tutorial.
 
 ```python
 from pathlib import Path
@@ -95,35 +72,48 @@ from landscapyml import (
 ML_FIGURE_DIR = Path("docs/cookbook/tutorial_ml_ssn_figures")
 ML_FIGURE_DIR.mkdir(parents=True, exist_ok=True)
 DEVICE = torch.device("cpu")
-
-if "knn_landscape" not in globals() or "positions" not in globals():
-    raise NameError("Run the two preceding SSN tutorials in the same session first")
-if "fitness_mean" not in knn_landscape.fitness_layers:
-    raise KeyError("The quantitative SSN tutorial must create 'fitness_mean' first")
-
-MODEL_NAME = "facebook/esm2_t6_8M_UR50D"
-if knn_landscape.get_embedding("plm") is None:
-    knn_landscape.compute_plm_embeddings(
-        domain="plm",
-        model_name=MODEL_NAME,
-        batch_size=8,
-        device="cpu",
-    )
-knn_landscape.set_active_embedding_domain("plm")
-
-print(
-    f"Ready: {len(knn_landscape.sequences)} sequences, "
-    f"PLM shape {knn_landscape.get_embedding('plm').shape}, "
-    f"fitness layers {sorted(knn_landscape.fitness_layers)}"
-)
 ```
 
-PLM embeddings are calculated from sequences, not fitness. Computing them
-before the split does not expose a test fitness value. For a real analysis,
-record the PLM model name and revision, pooling rule, and sequence
-preprocessing alongside the fitted model.
+An MLP treats every sequence as an independent row of numbers. We will fit the
+same architecture twice so that the only deliberate difference is its input
+representation. `SimpleMLP` has no Landscapy imports, `predict` method, or
+fitness-layer attributes.
 
-## 2. Make a deterministic split and mask the test fitness
+```python
+class SimpleMLP(nn.Module):
+    """A two-hidden-layer regressor for one vector per sequence."""
+
+    def __init__(
+        self,
+        input_width,
+        feature_mean,
+        feature_scale,
+        target_mean,
+        target_scale,
+    ):
+        super().__init__()
+        self.register_buffer("feature_mean", feature_mean.clone())
+        self.register_buffer("feature_scale", feature_scale.clone())
+        self.register_buffer("target_mean", target_mean.clone())
+        self.register_buffer("target_scale", target_scale.clone())
+        self.network = nn.Sequential(
+            nn.Linear(input_width, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1),
+        )
+
+    def forward(self, features):
+        if features.ndim == 1:
+            features = features.unsqueeze(0)
+        features = features.reshape(features.shape[0], -1)
+        normalized = (features - self.feature_mean) / self.feature_scale
+        standardized_prediction = self.network(normalized).squeeze(-1)
+        return standardized_prediction * self.target_scale + self.target_mean
+```
+
+## 1. Make a deterministic split and mask the test fitness
 
 We first copy the complete measured response into `measured_fitness`. This is
 the answer key used only after fitting. A fixed random-number seed then assigns
@@ -131,18 +121,17 @@ the answer key used only after fitting. A fixed random-number seed then assigns
 
 The validation rows help select a fitted state during training. The test rows
 are not used to fit parameters or choose a state. We replace only their values
-with `NaN` in a new layer named `fitness_for_ml`; `NaN` means “unknown”, not
-zero. The original `fitness_mean` layer remains unchanged because predictions
-should never overwrite measurements.
+with `NaN` in a new layer named `fitness_for_ml`. The original `fitness_mean`
+layer remains unchanged because predictions should never overwrite
+measurements.
 
 This random split mostly asks an interpolation question: can a model rank
 unseen values among similar sequences represented in the same dataset? A
 family, time, mutation-order, or low-to-high-fitness split asks a harder and
-different question. Choose a deterministic split that matches your intended
-prediction problem before fitting any models.
+different question.
 
 The block below also shows the fixed split on the existing display layout.
-Node positions and edges are unchanged; only the node colours are new.
+Node positions and edges are unchanged.
 
 ```python
 measured_fitness = (
@@ -245,56 +234,82 @@ plt.show()
 
 ![Training, validation, and held-out test nodes on the SSN](tutorial_ml_ssn_figures/ml_split.png)
 
-## 3. Define an ordinary PyTorch MLP
+## 2. Export OHE and PLM tensors through `landscapy-ml`
 
-An MLP treats every sequence as an independent row of numbers. We will fit the
-same architecture twice so that the only deliberate difference is its input
-representation.
+`export_landscape_records` asks the existing landscape for row-aligned
+features and the named masked target. Each exported record corresponds to the
+same row of `knn_landscape.sequences`. This avoids maintaining a second,
+potentially inconsistent sequence order.
 
-`SimpleMLP` below is intentionally just a PyTorch model. It has `forward`, but
-no Landscapy imports, `predict` method, or fitness-layer attributes. This is
-the situation many users start from when they bring their own trained model.
-The adapter introduced later will supply the small interface that the bridge
-needs.
-
-The model stores feature-normalisation values calculated from training rows
-only. It also stores the training-target mean and scale, allowing output to be
-returned in the original fitness units.
+`LandscapeDataset` turns those records into an ordinary PyTorch dataset. For
+OHE, each amino-acid position becomes a row containing one one and the
+remaining zeros, and we flatten the position-by-alphabet matrix for the MLP.
+For PLM, each sequence is already represented by one fixed-width vector that
+Landscapy computed earlier.
 
 ```python
-class SimpleMLP(nn.Module):
-    """A two-hidden-layer regressor for one vector per sequence."""
+def export_mlp_tensors(feature_view):
+    include_embeddings = feature_view == "embedding"
+    exported = export_landscape_records(
+        knn_landscape,
+        fitness_layers=["fitness_for_ml"],
+        feature_view=feature_view,
+        include_embeddings=include_embeddings,
+    )
+    feature_key = "embedding" if include_embeddings else "sequence_tensor"
+    dataset = LandscapeDataset(
+        exported.records,
+        input_getter=make_preferred_input_getter(feature_key),
+        target_getter=make_fitness_target_getter(
+            "fitness_for_ml",
+            dtype=torch.float32,
+        ),
+    )
 
-    def __init__(
-        self,
-        input_width,
-        feature_mean,
-        feature_scale,
-        target_mean,
-        target_scale,
-    ):
-        super().__init__()
-        self.register_buffer("feature_mean", feature_mean.clone())
-        self.register_buffer("feature_scale", feature_scale.clone())
-        self.register_buffer("target_mean", target_mean.clone())
-        self.register_buffer("target_scale", target_scale.clone())
-        self.network = nn.Sequential(
-            nn.Linear(input_width, 64),
-            nn.ReLU(),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, 1),
-        )
-
-    def forward(self, features):
-        if features.ndim == 1:
-            features = features.unsqueeze(0)
-        features = features.reshape(features.shape[0], -1)
-        normalized = (features - self.feature_mean) / self.feature_scale
-        standardized_prediction = self.network(normalized).squeeze(-1)
-        return standardized_prediction * self.target_scale + self.target_mean
+    feature_rows = []
+    target_rows = []
+    for row in range(len(dataset)):
+        feature, target = dataset[row]
+        feature_rows.append(feature.reshape(-1).float())
+        target_rows.append(target.float())
+    return torch.stack(feature_rows), torch.stack(target_rows), exported
 
 
+ohe_features, ohe_targets, ohe_export = export_mlp_tensors("ohe")
+plm_features, plm_targets, plm_export = export_mlp_tensors("embedding")
+
+print(
+    pd.DataFrame(
+        {
+            "records": [len(ohe_export.records), len(plm_export.records)],
+            "tensor shape": [tuple(ohe_features.shape), tuple(plm_features.shape)],
+            "hidden targets": [
+                int(torch.isnan(ohe_targets).sum()),
+                int(torch.isnan(plm_targets).sum()),
+            ],
+        },
+        index=["OHE", "PLM"],
+    )
+)
+```
+
+Both target tensors contain `NaN` in exactly the five test rows. The fitting
+function addresses only `train_rows` and `validation_rows`, so those hidden
+values cannot enter either the loss or model selection.
+
+## 3. Train the OHE and PLM MLPs
+
+The same training function now receives each exported tensor. Fixed seeds make
+parameter initialisation repeatable. The test values remain hidden throughout
+this block.
+
+The training curve should fall as the model learns the labelled rows. The
+validation curve often stops improving earlier (its lowest point selects the
+saved state). A low training loss with rising validation loss is overfitting:
+the model is learning the training rows without improving on unseen labelled
+rows.
+
+```python
 def train_mlp(features, targets, *, seed, epochs=500):
     """Fit one MLP and retain the state with the lowest validation loss."""
     torch.manual_seed(seed)
@@ -373,94 +388,8 @@ def train_mlp(features, targets, *, seed, epochs=500):
     model.load_state_dict(best_state)
     model.eval()
     return model, pd.DataFrame(history)
-```
-
-The loss curve is an optimisation diagnostic, not the final test performance.
-Five hundred epochs are feasible for this 25-node teaching example, but epoch
-count, hidden width, learning rate, and weight decay are modelling choices. In
-a real comparison, tune them with training and validation data only.
-
-## 4. Export OHE and PLM tensors through `landscapy-ml`
-
-`export_landscape_records` asks the existing landscape for row-aligned
-features and the named masked target. Each exported record corresponds to the
-same row of `knn_landscape.sequences`; this avoids maintaining a second,
-potentially inconsistent sequence order.
-
-`LandscapeDataset` turns those records into an ordinary PyTorch dataset. For
-OHE, each amino-acid position becomes a row containing one one and the
-remaining zeros, and we flatten the position-by-alphabet matrix for the MLP.
-For PLM, each sequence is already represented by one fixed-width vector that
-Landscapy computed earlier.
-
-```python
-def export_mlp_tensors(feature_view):
-    include_embeddings = feature_view == "embedding"
-    exported = export_landscape_records(
-        knn_landscape,
-        fitness_layers=["fitness_for_ml"],
-        feature_view=feature_view,
-        include_embeddings=include_embeddings,
-    )
-    feature_key = "embedding" if include_embeddings else "sequence_tensor"
-    dataset = LandscapeDataset(
-        exported.records,
-        input_getter=make_preferred_input_getter(feature_key),
-        target_getter=make_fitness_target_getter(
-            "fitness_for_ml",
-            dtype=torch.float32,
-        ),
-    )
-
-    feature_rows = []
-    target_rows = []
-    for row in range(len(dataset)):
-        feature, target = dataset[row]
-        feature_rows.append(feature.reshape(-1).float())
-        target_rows.append(target.float())
-    return torch.stack(feature_rows), torch.stack(target_rows), exported
 
 
-ohe_features, ohe_targets, ohe_export = export_mlp_tensors("ohe")
-plm_features, plm_targets, plm_export = export_mlp_tensors("embedding")
-
-print(
-    pd.DataFrame(
-        {
-            "records": [len(ohe_export.records), len(plm_export.records)],
-            "tensor shape": [tuple(ohe_features.shape), tuple(plm_features.shape)],
-            "hidden targets": [
-                int(torch.isnan(ohe_targets).sum()),
-                int(torch.isnan(plm_targets).sum()),
-            ],
-        },
-        index=["OHE", "PLM"],
-    )
-)
-```
-
-Both target tensors contain `NaN` in exactly the five test rows. The fitting
-function addresses only `train_rows` and `validation_rows`, so those hidden
-values cannot enter either the loss or model selection.
-
-This example's protein strings happen to have equal length, so OHE tensors can
-be stacked. They are not a biological alignment. On your own homologous
-proteins, flatten position-wise OHE only after producing and documenting a
-defensible alignment.
-
-## 5. Train the OHE and PLM MLPs
-
-The same training function now receives each exported tensor. Fixed seeds make
-parameter initialisation repeatable. The test values remain hidden throughout
-this block.
-
-The training curve should fall as the model learns the labelled rows. The
-validation curve often stops improving earlier; its lowest point selects the
-saved state. A low training loss with rising validation loss is overfitting:
-the model is learning the training rows without improving on unseen labelled
-rows.
-
-```python
 mlp_models = {}
 mlp_histories = {}
 
@@ -522,11 +451,11 @@ The selected red point is based on validation data, never test data. It is
 reasonable for OHE and PLM to select different epochs because their input
 values and fitted optimisation paths differ.
 
-## 6. Adapt your model and landscape inputs for inference
+## 4. Adapt your model and landscape inputs for inference
 
-This is the key bridge step. `infer_fitness_layer_from_landscape` needs to know
-how to obtain one batch of inputs and how to call the fitted model. It does not
-require the model class itself to depend on Landscapy.
+`infer_fitness_layer_from_landscape` needs to know how to obtain one batch of
+inputs and how to call the fitted model. It does not require the model class
+itself to depend on Landscapy.
 
 ### The model adapter
 
@@ -637,17 +566,13 @@ print(
 )
 ```
 
-The final check prints `True` for both wrappers. Python checks the required
-interface at runtime; the wrapper does not need to inherit from a special
-model base class.
-
 If your own model expects a different input object, keep the same division of
 responsibility: make `iter_batches` collect the required landscape data, make
 `to_model_inputs` assemble the exact tensor, dictionary, or tuple accepted by
 your model, and make the model adapter's `predict` return one output row per
 input sequence.
 
-## 7. Cast inference over the landscape and attach prediction layers
+## 5. Cast inference over the landscape and attach prediction layers
 
 We now pass each fitted model adapter and its matching input adapter to the
 same inference function. OHE uses the adapter instance defined above. PLM uses
@@ -709,31 +634,15 @@ print(
 )
 ```
 
-The table combines the wrapper class with provenance stored on each prediction
-layer, providing a quick audit of how the layers were produced. We return the
-active view to `fitness_for_ml`, so a later analysis does not silently treat a
-prediction as a measurement.
-
 Passing adapter objects directly is the clearest approach in a tutorial and
 works well for application code. If a model or input representation is reused
-across a package, `landscapy-ml` also provides registries that let developers
+across a package, `landscapy-ml` also provides registries that let users
 resolve those adapters by model class or by name.
 
-## 8. Measure held-out performance with Spearman's rho
+## 6. Measure held-out performance with Spearman's rho
 
-Now, and only now, we reveal the five measured test values. Spearman's rho
-compares their rank order with the predicted rank order:
-
-- `rho = 1` means the model put all held-out sequences in the same order as
-  their measured fitness;
-- `rho = 0` means there is no monotonic ranking agreement; and
-- `rho = -1` means the order is exactly reversed.
-
-Ranking can be useful when the practical goal is to prioritise sequences for
-follow-up. Rho does not tell us whether the numerical fitness values are well
-calibrated, and with only five test points it can change sharply when one
-sequence changes rank. Always report the held-out sample size and split rule
-with it.
+Ranking can be useful when the practical goal is to prioritise sequences with
+high expected fitness for further work.
 
 The scatter panels show the individual held-out values; the dashed diagonal is
 exact numerical agreement. The bar panel reports only Spearman's rho.
@@ -797,15 +706,13 @@ plt.show()
 
 In this deterministic run, the OHE model has `rho = 0.8` and the PLM model has
 `rho = 0.9`. Both rank the five held-out sequences similarly to their measured
-fitness. The numerical difference is descriptive only: five synthetic points
-cannot establish that one representation will rank new experimental sequences
-better.
+fitness.
 
 Do not change the split, seed, architecture, or training duration after seeing
 test rho in order to improve it. That would make the test set part of model
 selection and would overstate performance.
 
-## 9. Show the held-out predictions on the SSN
+## 7. Show the held-out predictions on the SSN
 
 A single rho value summarises rank agreement but does not show which sequences
 changed order. The graph view below shows where the held-out nodes lie in the
@@ -896,8 +803,7 @@ plt.show()
 Look for test nodes whose colours differ between the measured and prediction
 panels. Nearby errors can suggest weak training support or a model limitation,
 but their graph location does not by itself show that network position caused
-the error. The MLP did not use SSN edges; this view is a way to communicate the
-predictions in the landscape from which their sequence features were exported.
+the error.
 
 ## Reuse the adapter pipeline with your own model
 
@@ -907,22 +813,19 @@ Keep the order of operations and replace the tutorial-specific choices:
    fitness layer, and required embeddings have already been created.
 2. Preserve the complete measured target. Add a separate training-target layer
    with genuinely unavailable test values represented by `NaN`.
-3. Choose a deterministic split that matches the intended use of the model.
-4. Use `export_landscape_records` and `LandscapeDataset` to train without
+3. Use `export_landscape_records` and `LandscapeDataset` to train without
    changing the canonical landscape row order.
-5. Keep your existing model class focused on modelling. Write a small
+4. Keep your existing model class focused on modelling. Write a small
    `ModelAdapter`-compatible wrapper that declares the output `layer_kind` and
    forwards `predict`.
-6. Use the registered `"embedding"` input adapter for a model that consumes the
+5. Use the registered `"embedding"` input adapter for a model that consumes the
    active landscape embedding. Otherwise, subclass `LandscapeInputAdapter` and
    implement `iter_batches` plus `to_model_inputs` for your model's exact input
    object.
-7. Call `infer_fitness_layer_from_landscape` with the matching model and input
+6. Call `infer_fitness_layer_from_landscape` with the matching model and input
    adapters. Give every prediction layer a new, descriptive name.
-8. Inspect the attached metadata and return the active landscape view to the
+7. Inspect the attached metadata and return the active landscape view to the
    measured or masked layer after inference.
-9. Report Spearman's rho with the number of test sequences, the split rule, and
-   enough feature and model provenance for someone else to repeat the run.
 
 The reusable boundary is therefore small: the input adapter supplies
 row-aligned batches, the model adapter supplies predictions, and the bridge
@@ -930,9 +833,3 @@ casts those predictions back into the landscape data model. The fitted network
 can be your own PyTorch class, a model from another library, or a wrapper around
 an existing prediction service, provided the adapter returns one numeric value
 for each input sequence.
-
-This tutorial demonstrates the interface on one small, connected PLM kNN SSN
-with synthetic fitness. It does not establish that PLM features are better
-than OHE or that the chosen SSN represents a biological mechanism. Those are
-empirical questions requiring appropriately powered data, controls, and split
-designs.
