@@ -79,6 +79,7 @@ The [worked-example cookbook](https://github.com/RSCJacksonLab/landscapy/blob/ma
 
 - [Tutorial: constructing and analysing an SSN](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/tutorial-constructing-and-analysing-an-ssn.md)
 - [Tutorial: Quantitative analysis of an SSN](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/tutorial-quantitative-analysis-of-an-ssn.md)
+- [Tutorial: ML training and inference on an SSN](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/tutorial-ml-training-and-inference-on-an-ssn.md)
 - [Installation and system requirements](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/installation/README.md)
 - [Foundations](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/foundations/README.md)
 - [Components, topology, and annotated groups](https://github.com/RSCJacksonLab/landscapy/blob/main/docs/cookbook/topology/README.md)

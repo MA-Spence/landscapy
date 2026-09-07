@@ -792,3 +792,8 @@ permutations, its smallest possible value is `0.001`.
 For your own data, retain the workflow but replace `fitness_replicates` with a
 numeric array whose rows have been explicitly matched to
 `landscape.sequences`.
+
+Continue in the same Python session with [Tutorial: ML training and inference
+on an SSN](tutorial-ml-training-and-inference-on-an-ssn.md) to mask a held-out
+test set, train MLP and GCN models through `landscapy-ml`, and attach their
+predictions as new fitness layers.

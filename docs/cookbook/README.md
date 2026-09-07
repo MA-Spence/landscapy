@@ -15,7 +15,11 @@ communities, and a quotient graph. Continue in the same Python session with
 [Tutorial: Quantitative analysis of an
 SSN](tutorial-quantitative-analysis-of-an-ssn.md) to attach replicated synthetic
 fitness, select a scalar fitness view, and interpret graphical, spectral,
-subsampling, and permutation analyses.
+subsampling, and permutation analyses. Then continue with [Tutorial: ML
+training and inference on an
+SSN](tutorial-ml-training-and-inference-on-an-ssn.md) to mask held-out values,
+train OHE/PLM MLPs and a PLM GCN, attach prediction layers through
+`landscapy-ml`, and evaluate the models in figures.
 
 ## Sections
 
