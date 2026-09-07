@@ -30,17 +30,12 @@ In the numbered tutorial you will:
 6. examine the robustness of Dirichlet energy with graph subsampling and a
    fitness-permutation null.
 
-This is a manually run tutorial. Full graph eigendecomposition, repeated
-subsampling, and permutation analysis can be computationally expensive on a
-real SSN, so none of the code below is run in cookbook CI.
-
 ## 1. Prepare the continuation
 
 The imports below cover every subsequent block. `knn_landscape` and
 `positions` come from the preceding tutorial. We use an unweighted graph for
-all quantitative analyses so that graph construction, synthetic data, and
-analysis share one clearly stated convention. In particular, we do not assume
-that an edge field called `weight` is a biological conductance.
+all quantitative analyses so that graph construction and analysis share one
+clearly stated convention.
 
 The analytical autocorrelation used later requires a connected graph. The
 tutorial kNN graph is connected. For your own disconnected SSN, analyze an
@@ -166,10 +161,9 @@ print(spectral_design.round(2))
 ```
 
 The seeds make the five columns exactly reproducible. The replicate columns
-are not five independent biological systems: they are five synthetic
-measurements of one deliberately constructed latent pattern. Standardizing
-each column gives convenient arbitrary fitness units and does not change its
-fraction of spectral power.
+are five measurements of one deliberately constructed latent pattern.
+Standardizing each column gives convenient arbitrary fitness units and does
+not change its fraction of spectral power.
 
 ## 3. Attach the replicated fitness layer
 
@@ -255,21 +249,19 @@ nodes = draw_numeric_graph(
     knn_landscape,
     positions,
     mean_fitness,
-    "Synthetic fitness on the PLM kNN SSN",
+    "Fitness on the PLM kNN SSN",
 )
-fig.colorbar(nodes, ax=ax, label="mean synthetic fitness (standardized units)")
+fig.colorbar(nodes, ax=ax, label="mean fitness (standardized units)")
 fig.tight_layout()
 fig.savefig(QUANT_FIGURE_DIR / "synthetic_fitness.png", dpi=180, bbox_inches="tight")
 plt.show()
 ```
 
-![The PLM kNN SSN coloured by synthetic fitness](tutorial_quantitative_ssn_figures/synthetic_fitness.png)
+![The PLM kNN SSN coloured by fitness](tutorial_quantitative_ssn_figures/synthetic_fitness.png)
 
-Warm nodes have higher synthetic fitness and cool nodes have lower synthetic
-fitness. Smooth colour regions are expected because we designed most of the
-signal from low-frequency modes. The positions still show a two-dimensional
-PCA projection and the edges still show PLM kNN connections; neither was
-calculated from fitness.
+Warm nodes have higher fitness and cool nodes have lower fitness. The positions
+still show a two-dimensional PCA projection and the edges still show PLM kNN
+connections; neither was calculated from fitness.
 
 ## 5. Change the visible summary of the replicates
 
@@ -281,9 +273,7 @@ used.
 
 `ResampleFitnessModifier` fits a Gaussian from each sequence's five replicate
 values and draws one value from each fitted distribution. This is useful for
-propagating replicate variability through an analysis. The fixed seed makes
-this particular draw reproducible; a single draw is not an estimate of
-uncertainty by itself.
+propagating replicate variability through an analysis.
 
 ```python
 median_fitness = synthetic_layer.to_scalar(aggregate_func=np.median)
@@ -340,7 +330,7 @@ for ax, (layer_name, values) in zip(axes, fitness_views.items()):
         layer_name.replace("_", " ").capitalize(),
     )
     nodes.set_clim(-colour_limit, colour_limit)
-fig.colorbar(nodes, ax=axes, shrink=0.78, label="synthetic fitness (standardized units)")
+fig.colorbar(nodes, ax=axes, shrink=0.78, label="fitness (standardized units)")
 fig.savefig(QUANT_FIGURE_DIR / "fitness_views.png", dpi=180, bbox_inches="tight")
 plt.show()
 
@@ -350,7 +340,7 @@ knn_landscape.view("fitness_mean")
 
 ![Mean, median, and distribution-draw fitness views](tutorial_quantitative_ssn_figures/fitness_views.png)
 
-The three views are similar because the synthetic replicates are precise, but
+The three views are similar because the replicates are precise, but
 they are different active signals. On noisier experimental data, rerun the
 analysis across justified reductions or distribution draws instead of silently
 choosing the most attractive result.
@@ -365,8 +355,8 @@ of attraction** contains starting nodes whose repeated move to the fittest
 neighbour ends at a particular local maximum.
 
 Here the neutrality threshold is twice the median between-replicate standard
-deviation. It is therefore tied to the resolution of this synthetic experiment
-rather than chosen after looking at the neutral-network plot.
+deviation. It is therefore tied to the resolution of this experiment rather
+than chosen after looking at the neutral-network plot.
 
 ```python
 replicate_sd = fitness_replicates.std(axis=1, ddof=1)
@@ -429,6 +419,9 @@ The next figure combines those numerical results with their locations on the
 graph. The neutral-network panel retains faint non-neutral kNN edges for
 context. Colours in the basin and neutral panels are category labels; they do
 not imply an ordering.
+
+The following code block is only for rendering the results and is not part of
+Landscapy.
 
 ```python
 fig, axes = plt.subplots(1, 4, figsize=(20, 5.5))
@@ -538,7 +531,7 @@ axes[3].set_title(
 )
 axes[3].set_axis_off()
 
-fig.suptitle("Graph-based summaries of the mean synthetic fitness landscape", fontsize=15)
+fig.suptitle("Graph-based summaries of the mean fitness landscape", fontsize=15)
 fig.tight_layout()
 fig.savefig(QUANT_FIGURE_DIR / "graphical_analysis.png", dpi=180, bbox_inches="tight")
 plt.show()
@@ -548,10 +541,8 @@ plt.show()
 
 This run has two local maxima and therefore two greedy destinations. A large
 basin means many starting sequences reach the same peak under the stated
-best-neighbour rule; it does not measure evolutionary probability or time.
-Most neutral networks are small because few edges fall within the
-replicate-based equivalence threshold. A different defensible threshold should
-be reported as a sensitivity analysis, not substituted silently.
+best-neighbour rule. Most neutral networks are small because few edges fall
+within the replicate-based equivalence threshold.
 
 All three results are conditional on the kNN edges that were observed. An
 unmeasured or excluded fitter neighbour can turn an apparent maximum into an
@@ -614,11 +605,8 @@ spectral_summary = pd.Series(
 print(spectral_summary.round(3))
 ```
 
-`global_dirichlet_energy` is the once-per-edge total;
-`total_dirichlet_energy` is the historical Landscapy name for that total
-divided by node count. The lag-one equivalent length summarizes only the first
-autocorrelation step. It is not a general mixing time or proof that the curve
-follows one exponential.
+`global_dirichlet_energy` is the once-per-edge total, while
+`total_dirichlet_energy` is that total divided by node count.
 
 ```python
 fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
@@ -671,7 +659,7 @@ axes[2].set_ylabel("fitness autocorrelation")
 axes[2].set_ylim(-1.05, 1.05)
 axes[2].set_title(f"Stationary random-walk autocorrelation\nC(1) = {autocorrelation['autocorrelation'][1]:.2f}")
 
-fig.suptitle("Spectral analysis of the mean synthetic fitness landscape", fontsize=15)
+fig.suptitle("Spectral analysis of the mean fitness landscape", fontsize=15)
 fig.tight_layout()
 fig.savefig(QUANT_FIGURE_DIR / "spectral_analysis.png", dpi=180, bbox_inches="tight")
 plt.show()
@@ -680,16 +668,12 @@ plt.show()
 ![Dirichlet energy, graph Fourier power, and autocorrelation](tutorial_quantitative_ssn_figures/spectral_analysis.png)
 
 The local-energy panel identifies nodes surrounded by the largest fitness
-changes. The Fourier panel recovers the intended low-frequency concentration,
-and the positive, gradually decaying autocorrelation says that a random walker
-usually remains in a region of similar fitness for several steps. These
-descriptors are related, but they are not interchangeable.
-
-Raw Dirichlet energy depends on fitness units, node count, edge count, and the
-chosen graph. Fourier modes depend on the Laplacian convention. Autocorrelation
-depends on the random-walk convention and requires connected support. Do not
-rank two biological datasets by these numbers unless those differences have
-been addressed in the design.
+changes: brighter nodes contribute more strongly to the overall ruggedness.
+In the Fourier panel, a left-heavy spectrum indicates broad, smooth fitness
+regions, while substantial power in the high-frequency tail indicates rapid
+changes between neighbouring sequences. In the autocorrelation panel, slower
+decay means fitness remains similar across more graph steps; faster decay means
+that similarity is lost over shorter paths.
 
 ## 8. Check support robustness and compare with a random null
 
@@ -699,15 +683,12 @@ fixed graph.
 
 First, `subsample_analysis` repeatedly keeps 80% of nodes and 80% of their
 represented edges while returning a connected observed subgraph. This asks how
-much the descriptor changes when graph support is reduced. It does not create
-new biological replicates.
+much the descriptor changes when graph support is reduced.
 
 Second, we keep the complete graph and fitness-value distribution fixed, but
 shuffle which node receives each value. This is the correct permutation unit
 for the null question, “Is this fitness assignment smoother than a random
-assignment on the same graph?” The generic group-comparison permutation test
-would answer a different question, so the block explicitly permutes the
-node-aligned signal and evaluates the same Dirichlet quadratic form.
+assignment on the same graph?”
 
 ```python
 def per_node_dirichlet(sample):
@@ -792,37 +773,22 @@ plt.show()
 
 ![Dirichlet-energy subsampling and permutation analyses](tutorial_quantitative_ssn_figures/robustness.png)
 
-The subsampling interval is a sensitivity interval over correlated pieces of
-this one graph, not a population confidence interval. The complete-graph value
-falls near its upper end here because deleting edges removes terms from an
-edge-sum statistic even after division by node count. That support dependence
-should remain visible in the interpretation.
+Read the left panel by comparing the red complete-graph line with the blue
+subsample distribution. A narrow distribution close to the red line means the
+energy changes little when support is reduced. A broad or displaced
+distribution means the result is more sensitive to which nodes and edges are
+retained. Here the red line is near the upper edge, so most reduced graphs have
+lower energy than the complete graph.
 
-The observed energy lies below the random-placement distribution, as expected
-for data constructed from low-frequency modes. With 999 permutations, the
-smallest reportable Monte Carlo p-value is `1 / (999 + 1) = 0.001`, never zero.
-This result says only that the synthetic values are unusually smooth on this
-fixed kNN graph under node exchangeability. It does not validate the kNN graph,
-establish a biological mechanism, or make the 25 connected sequences
-independent observations.
+In the right panel, compare the red observed line with the grey
+random-placement distribution. A line far to the left indicates smoother
+fitness than most random assignments; overlap with the middle of the histogram
+indicates an unexceptional value. The lower-tail p-value is the fraction of
+random assignments at least as smooth as the observed one. With 999
+permutations, its smallest possible value is `0.001`.
 
 ## Reuse the pipeline with experimental fitness
 
 For your own data, retain the workflow but replace `fitness_replicates` with a
 numeric array whose rows have been explicitly matched to
-`landscape.sequences`. Keep these choices in the analysis record:
-
-- the fitness layer and whether mean, median, or distribution draws were
-  visible for each result;
-- the graph constructor, parameters, component-selection rule, and whether
-  edges were weighted;
-- a neutrality threshold justified by assay resolution or a predeclared
-  equivalence margin;
-- the Laplacian and random-walk conventions used for spectral quantities;
-- the node/edge retention and seed used for subsampling; and
-- the exchangeable unit, alternative direction, seed, and number of
-  permutations used for the null.
-
-The numerical methods describe fitness relative to the neighbourhoods encoded
-by the SSN. They do not rescue a graph whose edges, missing nodes, or component
-structure are inappropriate for the scientific question.
+`landscape.sequences`.
