@@ -34,6 +34,7 @@ dependencies = [
   'faiss-cpu>=1.11; platform_system == "Darwin" and platform_machine == "arm64"',
   'faiss-cpu>=1.11; platform_system == "Windows" and (platform_machine == "AMD64" or platform_machine == "ARM64" or platform_machine == "x86_64" or platform_machine == "arm64")',
   "gudhi>=3.11",
+  "landscapy-ml>=1,<2",
   "networkx>=3.2",
   "numpy>=1.24",
   "pandas>=2.3",
@@ -116,9 +117,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/RSCJacksonLab/landscapy"
-Issues = "https://github.com/RSCJacksonLab/landscapy/issues"
-Repository = "https://github.com/RSCJacksonLab/landscapy"
+Homepage = "https://github.com/MA-Spence/landscapy"
+Issues = "https://github.com/MA-Spence/landscapy/issues"
+Repository = "https://github.com/MA-Spence/landscapy"
 
 [project.scripts]
 landscapy = "fitness_landscape.__main__:cli"

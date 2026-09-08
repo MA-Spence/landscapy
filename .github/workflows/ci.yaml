@@ -5,6 +5,7 @@ on:
     branches: [main, dev, release]
   pull_request:
     branches: [main, dev, release]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,6 +18,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check out pinned Landscapy-ML 1.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: MA-Spence/landscapy-ml
+          ref: v1.0.0
+          path: .ci/landscapy-ml
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -25,6 +33,7 @@ jobs:
       - name: Install package and documentation dependencies
         run: |
           python -m pip install --upgrade pip
+          python -m pip install --no-deps .ci/landscapy-ml
           python -m pip install ".[dev]"
 
       - name: Validate public API and non-private source docstrings
@@ -66,6 +75,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check out pinned Landscapy-ML 1.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: MA-Spence/landscapy-ml
+          ref: v1.0.0
+          path: .ci/landscapy-ml
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -74,6 +90,7 @@ jobs:
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
+          python -m pip install --no-deps .ci/landscapy-ml
           python -m pip install ".[dev]"
 
       - name: Run test suite
@@ -122,20 +139,33 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check out pinned Landscapy-ML 1.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: MA-Spence/landscapy-ml
+          ref: v1.0.0
+          path: .ci/landscapy-ml
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Build wheel
+      - name: Build Landscapy and Landscapy-ML wheels
         run: |
           python -m pip install --upgrade pip build
+          python -m build --wheel --outdir minimal-dist .ci/landscapy-ml
           python -m build --wheel --outdir minimal-dist
 
       - name: Install default dependencies in a clean environment
         run: |
           python -m venv .minimal-venv
-          .minimal-venv/bin/python -m pip install minimal-dist/*.whl
+          .minimal-venv/bin/python -m pip install --find-links minimal-dist minimal-dist/landscapy-1.0.0-py3-none-any.whl
+          .minimal-venv/bin/python -m pip check
+
+      - name: Confirm both release packages were installed
+        run: |
+          .minimal-venv/bin/python -c "import fitness_landscape, landscapyml; assert fitness_landscape.__version__ == '1.0.0'; assert landscapyml.__version__ == '1.0.0'"
 
       - name: Exercise sequence, fitness, Hamming graph, and portable export
         run: .minimal-venv/bin/python scripts/minimal_install_smoke.py
@@ -154,6 +184,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Check out pinned Landscapy-ML 1.0 source
+        uses: actions/checkout@v4
+        with:
+          repository: MA-Spence/landscapy-ml
+          ref: v1.0.0
+          path: .ci/landscapy-ml
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -162,6 +199,7 @@ jobs:
       - name: Install the default feature set
         run: |
           python -m pip install --upgrade pip
+          python -m pip install --no-deps .ci/landscapy-ml
           python -m pip install "."
 
       - name: Exercise the installed CLI and a kNN landscape
