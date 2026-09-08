@@ -20,7 +20,7 @@ from .core import (
 )
 from .io import export_lsbundle, load_bundle_dir, save_bundle_dir
 
-__version__ = '0.9.0'
+__version__ = '1.0.0'
 
 __all__ = [
     'core',
